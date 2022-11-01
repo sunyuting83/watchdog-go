@@ -9,7 +9,9 @@ import (
 func WatchDog(AppName, RunPath string) {
 	task := func() {
 		line := "\\"
+		// fmt.Println("start")
 		if !isProcessExist(AppName) {
+			// fmt.Println("no")
 			var Exec string
 			runPath := "C:\\chiain"
 			Exec = strings.Join([]string{runPath, "chiaStart.bat"}, line)
@@ -29,29 +31,21 @@ func WatchDog(AppName, RunPath string) {
 
 func GetPublicWinCommandLine(command string) (s string) {
 	p, _ := utils.RunCommand(command)
-	p = utils.CompressStr(p)
-	pList := strings.Split(p, "\r\n")
-	for _, v := range pList {
-		if len(v) > 0 {
-			if strings.Contains(v, "=") {
-				s = strings.Split(v, "=")[1]
-				break
-			}
-		}
-	}
+	s = utils.CompressStr(p)
 	return
 }
 
 func isProcessExist(appName string) bool {
-	command := `wmic process where name="` + appName + `" get commandline 2>nul | find "daemon" 1>nul 2>nul && echo 1 || echo 0`
+	command := `wmic process where name="` + appName + `"`
 	c := GetPublicWinCommandLine(command)
-	if c == "1" {
-		return c == "1"
-	}
-	return false
+	// fmt.Println(c)
+	// fmt.Println("a")
+	// fmt.Println(appName)
+	// fmt.Println(strings.Contains(c, appName))
+	return strings.Contains(c, appName)
 }
 
 func main() {
 	RunPath := "c:\\chia\\daemon\\"
-	WatchDog("chia.exe", RunPath)
+	WatchDog("start_harvester.exe", RunPath)
 }
