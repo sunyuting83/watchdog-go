@@ -1,23 +1,38 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime"
 	"strings"
 	"time"
 	utils "watchdog/Utils"
 )
 
-func WatchDog(AppName, RunPath string) {
+func WatchDog(conf *utils.Config) {
 	task := func() {
 		line := "\\"
-		if !isProcessExist(AppName) {
-			var Exec string
-			runPath := "C:\\chiain"
-			Exec = strings.Join([]string{runPath, "chiaStart.bat"}, line)
-			go utils.RunCommand(Exec)
+		if len(conf.Watch) > 0 {
+			for i, Task := range conf.Watch {
+				if !isProcessExist(Task.TaskName) {
+					if len(conf.Kill) > 0 && i == 0 {
+						for _, Task := range conf.Kill {
+							utils.KillTask(Task)
+							time.Sleep(time.Duration(3) * time.Second)
+						}
+					}
+					time.Sleep(time.Duration(3) * time.Second)
+					var Exec string = Task.TaskName
+					if len(Task.RunPath) > 0 {
+						Exec = strings.Join([]string{Task.RunPath, Task.TaskName}, line)
+					}
+					utils.RunCMD(Exec)
+				}
+			}
 		}
 	}
 	var ch chan int
-	ticker := time.NewTicker(time.Second * time.Duration(30))
+	ticker := time.NewTicker(time.Second * time.Duration(conf.ScanTime))
 	go func() {
 		for range ticker.C {
 			task()
@@ -29,29 +44,36 @@ func WatchDog(AppName, RunPath string) {
 
 func GetPublicWinCommandLine(command string) (s string) {
 	p, _ := utils.RunCommand(command)
-	p = utils.CompressStr(p)
-	pList := strings.Split(p, "\r\n")
-	for _, v := range pList {
-		if len(v) > 0 {
-			if strings.Contains(v, "=") {
-				s = strings.Split(v, "=")[1]
-				break
-			}
-		}
-	}
+	s = utils.CompressStr(p)
 	return
 }
 
 func isProcessExist(appName string) bool {
-	command := `wmic process where name="` + appName + `" get commandline 2>nul | find "daemon" 1>nul 2>nul && echo 1 || echo 0`
-	c := GetPublicWinCommandLine(command)
-	if c == "1" {
-		return c == "1"
-	}
-	return false
+	// command := `wmic process where name="` + appName + `"`
+	c := GetPublicWinCommandLine(appName)
+	return strings.Contains(c, appName)
 }
 
 func main() {
-	RunPath := "c:\\chia\\daemon\\"
-	WatchDog("chia.exe", RunPath)
+	CurrentPath, _ := utils.GetCurrentPath()
+	OS := runtime.GOOS
+
+	lnk := strings.Join([]string{CurrentPath, "watchdog.lnk"}, "\\")
+	if !utils.Exists(lnk) {
+		fmt.Println("快捷方式不存在")
+		os.Exit(0)
+	}
+	home, _ := utils.HomeWindows()
+	p := "AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"
+	startPath := strings.Join([]string{home, p, "watchdog.lnk"}, "\\")
+	if !utils.Exists(startPath) {
+		s, _ := os.ReadFile(lnk)
+		os.WriteFile(startPath, s, 0644)
+	}
+	yaml, err := utils.CheckConfig(OS, CurrentPath)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(0)
+	}
+	WatchDog(yaml)
 }

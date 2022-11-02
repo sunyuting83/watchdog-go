@@ -1,2 +1,6 @@
 Watch:
- - 
+ - TaskName: dnmultiplayer.exe
+   RunPath: D:\ChangZhi\dnplayer2\
+Kill:
+ - iexplore.exe
+ScanTime: 30
