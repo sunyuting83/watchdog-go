@@ -10,23 +10,38 @@ import (
 )
 
 func WatchDog(conf *utils.Config) {
+	// fmt.Println("aaa")
 	task := func() {
 		line := "\\"
+		var run bool = false
 		if len(conf.Watch) > 0 {
-			for i, Task := range conf.Watch {
+			for _, Task := range conf.Watch {
 				if !isProcessExist(Task.TaskName) {
-					if len(conf.Kill) > 0 && i == 0 {
+					if len(conf.Kill) > 0 {
 						for _, Task := range conf.Kill {
-							utils.KillTask(Task)
-							time.Sleep(time.Duration(3) * time.Second)
+							go utils.KillTask(Task)
+							time.Sleep(200 * time.Millisecond)
 						}
 					}
 					time.Sleep(time.Duration(3) * time.Second)
+					run = true
+					break
+				}
+			}
+		}
+		if run {
+			if len(conf.Watch) > 0 {
+				for i, Task := range conf.Watch {
+					run = true
 					var Exec string = Task.TaskName
 					if len(Task.RunPath) > 0 {
 						Exec = strings.Join([]string{Task.RunPath, Task.TaskName}, line)
 					}
 					utils.RunCMD(Exec)
+					time.Sleep(time.Duration(1) * time.Second)
+					if i == len(conf.Watch) - 1 {
+						run = false
+					}
 				}
 			}
 		}
@@ -42,16 +57,55 @@ func WatchDog(conf *utils.Config) {
 	<-ch
 }
 
-func GetPublicWinCommandLine(command string) (s string) {
-	p, _ := utils.RunCommand(command)
+func GetPublicWinCommandLine(cmd string) (s string, err error) {
+	p, err := utils.RunCommand(cmd)
 	s = utils.CompressStr(p)
 	return
 }
 
 func isProcessExist(appName string) bool {
 	// command := `wmic process where name="` + appName + `"`
-	c := GetPublicWinCommandLine(appName)
-	return strings.Contains(c, appName)
+	App := strings.Join([]string{"name=", `"`, appName, `"`}, "")
+	cmd := strings.Join([]string{" process where", App, "get ProcessId"}, " ")
+	// fmt.Println(cmd)
+	c, err := GetPublicWinCommandLine(cmd)
+	if err != nil {
+		// fmt.Println("a" + err.Error())
+		return true
+	}
+	return strings.Contains(c, "ProcessId")
+}
+
+func checkFirst(appName string) bool {
+	App := strings.Join([]string{"name=", `"`, appName, `"`}, "")
+	cmd := strings.Join([]string{" process where", App, "get ProcessId"}, " ")
+	// fmt.Println(cmd)
+	c, err := utils.RunCommand(cmd)
+	if err != nil {
+		// fmt.Println("a" + err.Error())
+		return false
+	}
+	// fmt.Println(c)
+	line := "\r\n"
+	if !strings.Contains(c, line) {
+		line = "\n"
+	}
+	var PID []string
+	if strings.Contains(c, "ProcessId") {
+		pidList := strings.Split(c, line)
+		for _, item := range pidList {
+			CompressStr := utils.CompressStr(item)
+			if len(CompressStr) > 0 {
+				if !strings.Contains(item, "ProcessId") {
+					PID = append(PID, CompressStr)
+				}
+			}
+		}
+	}
+	// fmt.Println(PID)
+	// fmt.Println(len(PID))
+	// fmt.Println(len(PID) <= 1)
+	return len(PID) <= 1
 }
 
 func main() {
@@ -75,5 +129,11 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(0)
 	}
-	WatchDog(yaml)
+	check := checkFirst("watchdog.exe")
+	// WatchDog(yaml)
+	if check {
+		WatchDog(yaml)
+	} else {
+		os.Exit(0)
+	}
 }

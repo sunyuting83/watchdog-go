@@ -3,4 +3,4 @@ Watch:
    RunPath: D:\ChangZhi\dnplayer2\
 Kill:
  - iexplore.exe
-ScanTime: 30
+ScanTime: 120

@@ -33,10 +33,12 @@ type Task struct {
 }
 
 // RunCommand run command
-func RunCommand(app string) (k string, err error) {
-	App := strings.Join([]string{"name=", `"`, app, `"`}, "")
-	cmd := exec.Command("wmic", "process", "where", App)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+func RunCommand(command string) (k string, err error) {
+	cmd := exec.Command("wmic.exe")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CmdLine:    command,
+		HideWindow: true,
+	}
 	//fmt.Println(cmd)
 
 	stdout, err := cmd.StdoutPipe()
@@ -59,8 +61,11 @@ func RunCommand(app string) (k string, err error) {
 	}
 
 	if len(bytesErr) != 0 {
+		// fmt.Println(ConvertByte2String(bytesErr, "GB18030"))
+		if strings.Contains(ConvertByte2String(bytesErr, "GB18030"), "没有可用实例") {
+			return "", nil
+		}
 		return "", errors.New("0")
-
 	}
 
 	bytes, err := io.ReadAll(stdout)
@@ -71,6 +76,7 @@ func RunCommand(app string) (k string, err error) {
 	if err := cmd.Wait(); err != nil {
 		return "", err
 	}
+	// fmt.Println(ConvertByte2String(bytes, "GB18030"))
 	return ConvertByte2String(bytes, "GB18030"), nil
 }
 
@@ -107,6 +113,7 @@ func Exists(path string) bool {
 
 // RunUpdate command
 func RunCMD(cmdExec string) {
+	// fmt.Println("开")
 	cmd := exec.Command(cmdExec)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	cmd.Start()
@@ -143,9 +150,14 @@ func CheckConfig(OS, CurrentPath string) (conf *Config, err error) {
 }
 
 func KillTask(task string) {
-	cmd := exec.Command("taskkill.exe", "/F", "/IM", task)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	cmd.Start()
+	cmd := exec.Command("wmic.exe")
+	App := strings.Join([]string{"name=", `"`, task, `"`}, "")
+	command := strings.Join([]string{" process where", App, "call terminate"}, " ")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CmdLine:    command,
+		HideWindow: true,
+	}
+	cmd.Run()
 }
 
 func HomeWindows() (string, error) {
